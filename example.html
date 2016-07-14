@@ -1,73 +1,275 @@
 <!DOCTYPE html>
 <html lang="en_US">
-  <head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
-    <title>Realtime WebGL Globe Example</title>
-    <meta name="description" content="A webgl earth making it easy to add shapes at coordinates in realtime.">
-    <style>
-      body {
-        padding: 0;
-        margin: 0;
-        background: black;
-      }
 
-    </style>
-  </head>
-  <body>
-    <main>
-      <div id='globe'></div>
-    </main>
-      
-    </script>
-    <script src='https://cdnjs.cloudflare.com/ajax/libs/three.js/r70/three.min.js'></script>
-    <script src='globe.js'></script>
-    <script>
+<head>
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+	<title>Realtime WebGL Globe Example</title>
+	<meta name="description" content="A webgl earth making it easy to add shapes at coordinates in realtime.">
+	<style>
+		body {
+			padding: 0;
+			margin: 0;
+			background: black;
+		}
+		
+		#listContainer {
+			width: 400px;
+			position: absolute;
+			right: 0;
+			top: 0;
+			bottom: 0;
+			background: rgba(0, 0, 0, .4);
+			color: #fff;
+		}
+		
+		#list {
+			list-style: none;
+			padding: 0;
+		}
+		
+		#list li {
+			height: 40px;
+			padding: 10px 20px;
+			border-bottom: 1px solid rgba(255, 255, 255, 0.3);
+		}
+	</style>
+</head>
 
-      var div = document.getElementById('globe');
-      var urls = {
-        earth: 'img/world.jpg',
-        bump: 'img/bump.jpg',
-        specular: 'img/specular.jpg',
-      }
+<body>
+	<main>
+		<div id='globe' style="width:100%"></div>
+		<div id="listContainer">
+			<ul id="list"></ul>
+		</div>
+	</main>
 
-      // create a globe
-      var globe = new Globe(div, urls);
+<script src="https://cdn.jsdelivr.net/lodash/4.13.1/lodash.min.js"></script>
+	<script src='https://cdnjs.cloudflare.com/ajax/libs/three.js/r70/three.min.js'></script>
+	<script src='globe.js'></script>
+	<script>
 
-      // start it
-      globe.init();
+			var div = document.getElementById('globe');
+			var urls = {
+				earth: 'img/8081-earthmap10k.jpg'
+				,bump: 'img/8081-earthbump10k.jpg',
+				specular: 'img/8081-earthspec10k.jpg'
+			};
+			
+			function getRandomArbitrary(min, max) {
+				return Math.random() * (max - min) + min;
+			}
+			// create a globe
+			var globe = new Globe(div, urls);
 
-      // - create a random block (somewhere on earth)
-      // - center the globe to that position
-      // - spawn the block on that position (after 300ms)
-      var drawRandomLevitatingBlock = function() {
-        var data = {
-          color: '#'+Math.floor(Math.random()*16777215).toString(16),
-          size: Math.random() * 100,
-          //lat: Math.random() * 160 - 80,
-          //lon: Math.random() * 360 - 180,
-          lat:59.2978061,
-          lon: 17.8749145,
-          size: 20
-        };
+			// start it
+			globe.init();
 
-        // center the globe to the position
-        globe.center(data);
+			var painted = 0;
+			var colorFn = function (c,x) {
+				var h = c.getHSL();
+				c.setHSL(h.h,x/100, 0.5);
+				return c;
+			 };
 
-        setTimeout(function() {
-          // offset the lat/long so you can actually
-          // see the block levitating
-          
-          //data.lat += 10;
-          //data.lon += 10;
+			 var isZooming = false;
+			 var zoom = 0;
+			 var zoomMax = 4;
+				function animateZoom() {
 
-          globe.addLevitatingBlock(data);
-        }, 300);
-      }
+					zoom = getRandomArbitrary(-2,12);
+					if(zoom < 0) {
+						zoom = 0;
+					}
+					else if(zoom > 5){
+					 zoom = 1; 
+					}else {
+						zoom = -1;
+					}
 
-      setInterval(drawRandomLevitatingBlock, 2000);
+					console.log(zoom);
 
-    </script>
-  </body>
+					var zoomLength = getRandomArbitrary(0.1,2);
+
+					if(!isZooming) {
+						isZooming = true;          
+						var runs =0; 
+						var ii = setInterval(function () {
+							runs += 1;
+							globe.zoomRelative(zoom);
+							if(runs >  100 * zoomLength) {
+								isZooming = false;
+								clearInterval(ii);
+								runs = 0;
+								isZooming = false;
+							}
+						}, 10);
+					}
+					 
+				}
+
+				colors = ['#FF6200','#2200FF','#BBFF00'];
+			// - create a random block (somewhere on earth)
+			// - center the globe to that position
+			// - spawn the block on that position (after 300ms)
+			var drawRandomLevitatingBlock = function() {
+				painted+=1;
+				var data = {
+					color: colors[Math.floor(Math.random()*colors.length)],
+					//color:'#00aa00',
+					size: Math.random() * 100,
+					//lat: Math.random() * 160 - 80,
+					//lon: Math.random() * 360 - 180,
+					 //size: 10,
+					 lat: 59.2978061 * getRandomArbitrary(0.999,1.11),
+					 lon: 17.8749145 * getRandomArbitrary(0.9,1.01),
+					levitation: 0.2,
+					timeout: 20000,
+
+				};
+				//data.color = parseInt(data.color);
+				var color = new THREE.Color( data.color );
+				var hex = color.getHex();
+
+				//data.opacity = 1.1*data.size/100;
+				//data.size = data.size * 0.3;
+
+			 
+			 
+				globe.addLevitatingBlock(data);
+				if(painted % 100 == 0 ) {
+					animateZoom(data);
+					setTimeout(function() {
+						// needs to run async to not mess up adding position
+						// center the globe to the position
+						globe.center(data,true);
+					},30);
+				}
+			}
+
+			 
+			// auto ad
+			
+		 
+
+		</script>
+	<script>
+		function cPos(lat, lon, city) {
+			return {lat:lat, lon:lon,city:city};
+		}
+
+		function getRandom(arr) {
+			return arr[Math.floor(Math.random()*arr.length)];
+		}
+
+		var _typeColor = {
+			newBooking: "#2E0927",
+			login: "#D90000",
+			startup: "#FF2D00",
+			schedule: "#FF8C00",
+			portal: "#FF8C00"
+		};
+
+		var _types = ["newBooking", "login", "startup"];
+		var _systems = ["Caspeco", "Anders kojja", "Hyper Island"];
+		var _pos = [
+			cPos(59.3318278,18.086084,"Stockholm Strandvägen"),
+			cPos(59.3457447,18.0270373,"Stockholm Vasastan"),
+			cPos(55.5706802,12.880191,"Malmö"),
+			cPos(57.7020123,11.613507,"Göteborg"),
+			cPos(65.587156,22.111318,"Luleå"),
+			cPos(59.3929427,13.4534777,"Karlstad"),
+			cPos(59.2781423,15.1324152,"Örebro"),
+			cPos(63.1754132,14.581593,"Östersund"),
+			cPos(27.9965012,-82.5942832,"Tampa"),
+			cPos(30.3079828,-97.8934867,"Austin"),
+			cPos(32.0880168,34.7272058,"Tel aviv"),
+			cPos(55.6713442,12.4907993,"Köpenhamn"),
+				
+			];
+		
+		/*
+		var obj = {
+			type: 'newBooking',
+			system: 'system',
+			pos: {lat:1,lon:2,city:"Stockholm"}
+		};
+		*/
+
+		function addData(data) {
+			// add to list
+			// add to map
+			listData(data);
+			drawData(data);
+		}
+			var list = document.getElementById('list');
+		function listData(d) {
+			var span = document.createElement("li");
+			span.innerText = d.pos.city + " - " + d.system + " - " + d.type; 
+
+			list.insertBefore( span, list.firstChild );
+			
+		}
+
+		function adjust(pos) {
+			var adj =  getRandomArbitrary(-0.3,0.3);
+			console.log("adjusted with ", adj);
+			pos += adj;
+			return pos;
+		}
+
+		var throttled = _.throttle(function (data) {
+					console.log("Hello");
+					var x = JSON.stringify(data);
+					x = JSON.parse(x);
+					animateZoom(x);
+					
+						// needs to run async to not mess up adding position
+						// center the globe to the position
+						globe.center(x,true);
+					
+				}, 12000);
+		
+		painted = 0;
+		function drawData(d) {
+				painted+=1;
+				var data = {
+					color: _typeColor[d.type],
+					size: Math.random() * 100,
+					lat: adjust(d.pos.lat),
+					lon: adjust(d.pos.lon),
+					levitation: 1 * getRandomArbitrary(0.1,4),
+					timeout: 6000
+				};
+							 
+				globe.addLevitatingBlock(data);
+				throttled(data);
+				
+			}
+		
+		function mockData() {
+			var d = {
+				type: getRandom(_types),
+				system: getRandom(_systems),
+				pos: getRandom(_pos),
+			}
+
+			addData(d);			
+		}
+		setInterval(mockData,500);
+		
+		//var si = setInterval(drawRandomLevitatingBlock, 100);
+		//var exampleSocket = new WebSocket("ws://localhost:5000/socket");
+		/*exampleSocket.onopen = function (event) {
+			console.log("S OPEN", event);
+  			exampleSocket.send("Here's some text that the server is urgently awaiting!"); 
+		};
+		exampleSocket.onmessage = function (event) {
+  			console.log(event.data);
+			  addData(JSON.parse(event.data));
+		}*/
+	</script>
+</body>
+
 </html>

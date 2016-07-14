@@ -22,12 +22,12 @@ var Globe = function Globe(container, urls) {
   var scene;
   var light;
   var renderer;
-
+  
   var earthGeometry;
   var earthPosition;
 
   // camera's distance from center (and thus the globe)
-  var distanceTarget = 900;
+  var distanceTarget = 500;
   var distance = distanceTarget;
 
   // camera's position
@@ -65,6 +65,7 @@ var Globe = function Globe(container, urls) {
 
     // Light, reposition close to camera
     light = createMesh.directionalLight();
+    light.color = new THREE.Color("#222299");
 
     // we use this to correctly position camera and blocks
     var earth = createMesh.earth(urls);
@@ -106,6 +107,7 @@ var Globe = function Globe(container, urls) {
     h = container.offsetHeight || window.innerHeight;
   }
 
+  
   var createMesh = {
 
     // @param urls Object URLs of images
@@ -156,17 +158,18 @@ var Globe = function Globe(container, urls) {
         fragmentShader: [
           'varying vec3 vNormal;',
           'void main() {',
-            'float intensity = pow( 0.8 - dot( vNormal, vec3( 0, 0, 1.0 ) ), 7.0 );',
-            'gl_FragColor = vec4( 0.7, 1.0, 0.7, 1.0 ) * intensity;',
+            'float intensity = pow( 0.8 - dot( vNormal, vec3( 0, 0, 1.0 ) ), 10.0 );',
+            'gl_FragColor = vec4( 0.16, 0.18, 0.68, .9 ) * intensity;',
           '}'
         ].join('\n'),
         side: THREE.BackSide,
         blending: THREE.AdditiveBlending,
-        transparent: false
+        transparent: true
       });
 
       var mesh = new THREE.Mesh(earthGeometry, material);
       mesh.scale.set(1.1, 1.1, 1.1);
+      mesh.rotation.y = Math.PI;
       return mesh;
     },
 
@@ -175,10 +178,28 @@ var Globe = function Globe(container, urls) {
     },
 
 
-    block: function(color) {
+    block: function(color, opacity) {
+      var geo = new THREE.BoxGeometry(0.1,0.1,5);
+      geo.computeFaceNormals();
+      geo.computeVertexNormals();
       return new THREE.Mesh(
-        new THREE.BoxGeometry(1, 1, 1),
-        new THREE.MeshLambertMaterial({color: color})
+        geo,
+        new THREE.MeshPhongMaterial({
+          // #FF9500
+          color: color,
+          emissive: color,
+          specular:color,
+          
+          //shininess:10,
+          shading: THREE.FlatShading,
+
+          //wireframe: true,
+          //reflectivity:10,
+          opacity: 0.7,// opacity || 0.9,
+          wireframeLinewidth:10,
+          //vertexColors: THREE.FaceColors,
+         // morphTargets:true,
+           transparent: true})
       );
     }
 
@@ -256,8 +277,8 @@ var Globe = function Globe(container, urls) {
 
   var checkAltituteBoundries = function() {
     // max zoom
-    if(distanceTarget < 300)
-      distanceTarget = 300;
+    if(distanceTarget < 250)
+      distanceTarget = 250;
 
     // min zoom
     else if(distanceTarget > 900)
@@ -268,13 +289,20 @@ var Globe = function Globe(container, urls) {
     requestAnimationFrame(animate);
     render();
   }
-
+  var ROTATIONSPEED= 0.0001;
+  var k = ROTATIONSPEED;
+  
   var render = function() {
     levitateBlocks();
 
     // Rotate towards the target
+   
+    target.x -= k;
+    target.y -= k / 2;
+
     rotation.x += (target.x - rotation.x) * 0.1;
-    rotation.y += (target.y - rotation.y) * 0.1;
+    //target.y = Math.PI / 5.0;
+      rotation.y += (target.y - rotation.y) * 0.02;
     distance += (distanceTarget - distance) * 0.3;
 
     // determine camera position
@@ -290,7 +318,12 @@ var Globe = function Globe(container, urls) {
       y: rotation.y - 150,
       altitude: distance
     });
+    
+    //camera.position.x = distance * Math.sin(rotation.x) * Math.cos(rotation.y);
+    //camera.position.y = distance * Math.sin(rotation.y);
+    //camera.position.z = distance * Math.cos(rotation.x) * Math.cos(rotation.y);
 
+    //camera.target.position.x += (3000 - camera.target.position.x)*0.005;
     camera.lookAt(earthPosition);
     renderer.render(scene, camera);
   }
@@ -333,7 +366,7 @@ var Globe = function Globe(container, urls) {
   // space just below the earths surface
   var createLevitatingBlock = function(properties) {
     // create mesh
-    var block = createMesh.block(properties.color);
+    var block = createMesh.block(properties.color, properties.opacity);
 
     // calculate 2d position
     var pos2d = calculate2dPosition(properties);
@@ -349,7 +382,7 @@ var Globe = function Globe(container, urls) {
       altitude: 200 - properties.size / 1.5,
       // speed at which block levitates outside
       // earth's core
-      levitation: .1,
+      levitation: properties.levitation || .1,
 
       size: properties.size
     }
@@ -361,8 +394,8 @@ var Globe = function Globe(container, urls) {
     block.lookAt(earthPosition);
 
     block.scale.z = properties.size;
-    block.scale.x = properties.size;
-    block.scale.y = properties.size;
+    //block.scale.x = properties.size;
+    //block.scale.y = properties.size;
 
     block.updateMatrix();
     
@@ -388,8 +421,8 @@ var Globe = function Globe(container, urls) {
     block.lookAt(earthPosition);
 
     block.scale.z = properties.size;
-    block.scale.x = properties.size;
-    block.scale.y = properties.size;
+    //block.scale.x = properties.size;
+    //block.scale.y = properties.size;
 
     block.updateMatrix();
     
@@ -413,6 +446,10 @@ var Globe = function Globe(container, urls) {
       set3dPosition(block);
       block.updateMatrix();
     });
+  }
+
+  function getRandomArbitrary(min, max) {
+        return Math.random() * (max - min) + min;
   }
 
   //        Public functions
@@ -470,8 +507,23 @@ var Globe = function Globe(container, urls) {
    * @param  {Float} pos.lon - longtitute position
    * @return {this}
    */
-  api.center = function(pos) {
+  api.center = function(pos, fuzzy) {
+    console.log(distance,"post",pos);
+     if(fuzzy) {
+       var scale = Math.pow(2, distance/100 * 0.3);
+       console.log(distance, scale);
+      pos.lat -= Math.abs((getRandomArbitrary(scale * 10 ,scale * 20)  * getRandomArbitrary(-0.1,0.1)) / 10);
+      //pos.lat += (getRandomArbitrary(1,4) * getRandomArbitrary(-2,0.1));
+      var lon = (getRandomArbitrary(scale * 10 ,scale * 20)  * getRandomArbitrary(-0.1,0.1));
+      console.log("Shift lon", lon);
+      pos.lon += lon;
+      //target.y += getRandomArbitrary(1,5) * getRandomArbitrary(-1,1);
+    }
     target = calculate2dPosition(pos);
+    console.log("Target",target);
+   
+    
+    k = -k; // invert movement
     return this;
   }
 
@@ -506,7 +558,15 @@ var Globe = function Globe(container, urls) {
 
     scene.add(block);
     levitatingBlocks.push(block);
-    blocks.push(block);
+    var len = blocks.push(block);
+
+
+    if(data.timeout) {
+      setTimeout(function () {
+      scene.remove(block)
+      blocks[len -1] = null;
+      }, data.timeout);
+    }
 
     return this;
   }
